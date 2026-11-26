@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ADB Deck — Live Bridge &amp; WebUSB Control</title>
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem("adb_deck_theme");
+        var theme = saved === "light" || saved === "dark" ? saved : "dark";
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (_) {}
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Afacad+Flux:wght@600;700&amp;family=Instrument+Sans:wght@400;500;600&amp;family=Spline+Sans+Mono:wght@500&amp;display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <div class="brand">
+          <div class="brand-mark">
+            <span class="material-symbols-outlined" aria-hidden="true">phonelink</span>
+          </div>
+          <div class="brand-text">
+            <h1>ADB Deck</h1>
+            <p class="subtitle">Android Bridge</p>
+          </div>
+        </div>
+
+        <nav aria-label="Main navigation">
+          <ul class="nav-list">
+            <li>
+              <button class="tab active" data-tab="dashboard" type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">dashboard</span>
+                <span>Dashboard</span>
+              </button>
+            </li>
+            <li>
+              <button class="tab" data-tab="pairing" type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">qr_code_scanner</span>
+                <span>Pair Device</span>
+              </button>
+            </li>
+            <li>
+              <button class="tab" data-tab="devices" type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">devices</span>
+                <span>Devices</span>
+              </button>
+              <ul id="sidebarDeviceTree" class="nav-sublist hidden" aria-label="Connected devices hierarchy"></ul>
+            </li>
+            <li>
+              <button class="tab" data-tab="scrcpy" type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">cast</span>
+                <span>Mirror</span>
+              </button>
+            </li>
+          </ul>
+        </nav>
+
+        <!-- Only shown when 2+ devices are connected -->
+        <div id="sidebarDeviceWrap" class="sidebar-device-wrap hidden">
+          <label for="deviceSelect">Active Device</label>
+          <select id="deviceSelect"></select>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button id="bridgeSettingsBtn" class="bridge-footer-btn" type="button">
+          <div class="bridge-avatar">
+            <span class="material-symbols-outlined" aria-hidden="true">tune</span>
+          </div>
+          <div class="bridge-footer-meta">
+            <span class="bridge-footer-title">Settings</span>
+            <span id="bridgeEndpointLabel" class="bridge-footer-sub">127.0.0.1:8787</span>
+          </div>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="main-area">
+      <div class="main-inner">
+        <header class="main-header">
+          <div class="page-title-wrap">
+            <h2 id="pageTitle" class="page-title">Dashboard</h2>
+            <p id="pageSubtitle" class="muted">Active device &amp; shortcuts.</p>
+          </div>
+
+          <div class="header-actions">
+            <button id="themeToggleBtn" class="header-chip theme-toggle-btn" type="button" aria-label="Switch color theme to light mode (currently dark mode)" aria-pressed="false">
+              <span id="themeToggleIcon" class="material-symbols-outlined" aria-hidden="true">light_mode</span>
+              <span id="themeToggleLabel" class="header-chip-label">Light mode</span>
+            </button>
+
+            <button id="wsBadge" class="header-chip badge badge-warn" type="button" aria-live="polite" aria-label="Bridge connection status: Connecting to local ADB bridge. Click to open Settings.">
+              <span class="status-dot" aria-hidden="true"></span>
+              <span id="wsBadgeIcon" class="material-symbols-outlined icon-sm" aria-hidden="true">sync</span>
+              <span id="wsBadgeLabel" class="header-chip-label">Connecting...</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- DASHBOARD PANEL -->
+        <section id="tab-dashboard" class="panel active" aria-label="Dashboard">
+          <div id="dashboardHeroCard" class="hero-card"></div>
+
+          <div class="quick-grid">
+            <!-- Wireless QR Pairing Card (shown only when no device is connected) -->
+            <article id="dashPairingCard" class="quick-card">
+              <div class="quick-card-top">
+                <div class="quick-card-header">
+                  <div class="quick-icon-box">
+                    <span class="material-symbols-outlined" aria-hidden="true">qr_code_scanner</span>
+                  </div>
+                  <span id="dashPairingBadge" class="pill-tag pill-tag-primary">Ready</span>
+                </div>
+                <div>
+                  <h3>Wireless QR Pairing</h3>
+                  <p class="muted" style="margin-top:4px;">Pair Android 11+ devices over Wi-Fi.</p>
+                </div>
+              </div>
+              <div class="quick-card-footer">
+                <button id="dashOpenPairingBtn" class="btn btn-secondary btn-sm" type="button">Open pairing</button>
+              </div>
+            </article>
+
+            <!-- scrcpy Mirror Card -->
+            <article class="quick-card">
+              <div class="quick-card-top">
+                <div class="quick-card-header">
+                  <div class="quick-icon-box">
+                    <span class="material-symbols-outlined" aria-hidden="true">cast</span>
+                  </div>
+                  <span id="dashScrcpyBadge" class="pill-tag pill-tag-neutral">Idle</span>
+                </div>
+                <div>
+                  <h3>Screen Mirror</h3>
+                  <p class="muted" style="margin-top:4px;">Adjust resolution, bitrate, and display options.</p>
+                </div>
+              </div>
+              <div class="quick-card-footer">
+                <button id="dashOpenScrcpyBtn" class="btn btn-secondary btn-sm" type="button">Mirror settings</button>
+              </div>
+            </article>
+
+            <!-- APK Manager Card -->
+            <article class="quick-card">
+              <div class="quick-card-top">
+                <div class="quick-card-header">
+                  <div class="quick-icon-box">
+                    <span class="material-symbols-outlined" aria-hidden="true">install_mobile</span>
+                  </div>
+                  <span id="dashApkBadge" class="pill-tag pill-tag-neutral">Ready</span>
+                </div>
+                <div>
+                  <h3>APK Manager</h3>
+                  <p class="muted" style="margin-top:4px;">Install, pull, stop, or remove apps.</p>
+                </div>
+              </div>
+              <div class="quick-card-footer">
+                <button id="dashOpenApksBtn" class="btn btn-secondary btn-sm" type="button">Manage APKs</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- PAIR DEVICE WIZARD PANEL -->
+        <section id="tab-pairing" class="panel" aria-label="Pair Device">
+          <div id="pairingBridgeBanner" class="mode-banner hidden">
+            <div>
+              <strong>Local Bridge Required</strong>
+              <p class="muted">Wireless QR pairing requires Local Bridge mode.</p>
+            </div>
+            <button class="btn btn-primary btn-sm switch-to-bridge-btn" type="button">Switch to Local Bridge</button>
+          </div>
+
+          <div id="pairingContent" class="wizard-wrap">
+            <article class="wizard-card">
+              <header class="wizard-appbar">
+                <div class="wizard-appbar-left">
+                  <button id="wizardCloseBtn" class="icon-btn" type="button" aria-label="Back to dashboard">
+                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                  </button>
+                  <span id="wizardStepTitle" class="wizard-title">Choose Phone Type</span>
+                </div>
+                <span id="wizardStepPill" class="pill-tag pill-tag-neutral">Step 1 of 4</span>
+              </header>
+
+              <div class="wizard-body">
+                <div class="step-indicator">
+                  <div class="step-bars">
+                    <div class="step-bar done" data-step-bar="1"></div>
+                    <div class="step-bar" data-step-bar="2"></div>
+                    <div class="step-bar" data-step-bar="3"></div>
+                    <div class="step-bar" data-step-bar="4"></div>
+                  </div>
+                  <div class="step-tabs">
+                    <button class="step-tab active" data-step-target="1" type="button">Phone</button>
+                    <button class="step-tab" data-step-target="2" type="button">Scan QR</button>
+                    <button class="step-tab" data-step-target="3" type="button">Connect</button>
+                    <button class="step-tab" data-step-target="4" type="button">Done</button>
+                  </div>
+                </div>
+
+                <!-- STEP 1: CHOOSE PHONE TYPE -->
+                <div id="wizardStep1" class="wizard-step active">
+                  <h3>Select your Android brand</h3>
+
+                  <ul class="oem-list" role="radiogroup" aria-label="Android brand">
+                    <li class="oem-option" role="radio" aria-checked="true" tabindex="0" data-oem="pixel">
+                      <div class="oem-option-left">
+                        <div class="oem-icon-tile">
+                          <span class="material-symbols-outlined" aria-hidden="true">phone_android</span>
+                        </div>
+                        <div>
+                          <span class="oem-title">Pixel / Stock</span>
+                          <span class="oem-sub">Stock Android</span>
+                        </div>
+                      </div>
+                      <span class="radio-ring"><span class="radio-dot"></span></span>
+                    </li>
+
+                    <li class="oem-option" role="radio" aria-checked="false" tabindex="0" data-oem="samsung">
+                      <div class="oem-option-left">
+                        <div class="oem-icon-tile">
+                          <span class="material-symbols-outlined" aria-hidden="true">smartphone</span>
+                        </div>
+                        <div>
+                          <span class="oem-title">Samsung Galaxy</span>
+                          <span class="oem-sub">One UI</span>
+                        </div>
+                      </div>
+                      <span class="radio-ring"><span class="radio-dot"></span></span>
+                    </li>
+
+                    <li class="oem-option" role="radio" aria-checked="false" tabindex="0" data-oem="xiaomi">
+                      <div class="oem-option-left">
+                        <div class="oem-icon-tile">
+                          <span class="material-symbols-outlined" aria-hidden="true">phone_android</span>
+                        </div>
+                        <div>
+                          <span class="oem-title">Xiaomi</span>
+                          <span class="oem-sub">HyperOS / MIUI</span>
+                        </div>
+                      </div>
+                      <span class="radio-ring"><span class="radio-dot"></span></span>
+                    </li>
+
+                    <li class="oem-option" role="radio" aria-checked="false" tabindex="0" data-oem="oneplus">
+                      <div class="oem-option-left">
+                        <div class="oem-icon-tile">
+                          <span class="material-symbols-outlined" aria-hidden="true">smartphone</span>
+                        </div>
+                        <div>
+                          <span class="oem-title">OnePlus</span>
+                          <span class="oem-sub">OxygenOS</span>
+                        </div>
+                      </div>
+                      <span class="radio-ring"><span class="radio-dot"></span></span>
+                    </li>
+                  </ul>
+
+                  <details class="disclosure">
+                    <summary>
+                      <span>Setup steps (<span id="oemGuideName">Pixel</span>)</span>
+                      <span class="material-symbols-outlined disclosure-chevron" aria-hidden="true">expand_more</span>
+                    </summary>
+                    <div class="disclosure-body">
+                      <ol id="oemSteps" class="wizard-steps"></ol>
+                      <div class="tip-box">
+                        <span class="material-symbols-outlined" aria-hidden="true">lightbulb</span>
+                        <span>Add the <em>Wireless Debugging</em> tile to Quick Settings for one-tap access later.</span>
+                      </div>
+                    </div>
+                  </details>
+
+                  <footer class="wizard-footer">
+                    <span class="mono">Step 1 of 4</span>
+                    <button id="wizardToQrBtn" class="btn btn-primary" type="button">
+                      <span>Continue</span>
+                      <span class="material-symbols-outlined icon-sm" aria-hidden="true">arrow_forward</span>
+                    </button>
+                  </footer>
+                </div>
+
+                <!-- STEP 2: SCAN QR CODE -->
+                <div id="wizardStep2" class="wizard-step">
+                  <div class="scanner-stage">
+                    <div class="qr-frame">
+                      <img id="qrImage" class="qr-img hidden" alt="ADB Wireless Pairing QR" />
+                      <div id="qrPlaceholder" class="qr-placeholder">
+                        <span class="material-symbols-outlined" aria-hidden="true">qr_code_2</span>
+                        <span>Generate a pairing QR code</span>
+                      </div>
+                    </div>
+
+                    <div class="btn-row" style="justify-content:center;">
+                      <button id="startQrBtn" class="btn btn-primary btn-sm" type="button">
+                        <span class="material-symbols-outlined icon-sm" aria-hidden="true">qr_code_2</span>
+                        <span>Generate QR</span>
+                      </button>
+                      <span id="qrCodePill" class="badge badge-warn">Not started</span>
+                    </div>
+
+                    <div id="qrStatus" class="status-box">Ready to start mDNS pairing.</div>
+                  </div>
+
+                  <div class="qr-instructions">
+                    <p class="muted" style="max-width:380px;">
+                      Open <strong>Wireless debugging</strong> &rarr; <strong>Pair device with QR code</strong>.
+                    </p>
+                    <button id="toggleManualPairBtn" class="btn btn-secondary btn-sm" type="button">
+                      <span class="material-symbols-outlined icon-sm" style="color:var(--primary-text);" aria-hidden="true">keyboard</span>
+                      <span>Enter code manually</span>
+                    </button>
+                  </div>
+
+                  <div id="manualPairPanel" class="manual-pair-panel hidden">
+                    <strong style="font-size:14px;">Manual Pair / Connect</strong>
+                    <div class="form-row">
+                      <input id="pairAddr" type="text" placeholder="IP:Port (192.168.1.20:37123)" />
+                      <input id="pairCode" type="text" placeholder="6-digit code" />
+                      <button id="pairCodeBtn" class="btn btn-primary btn-sm" type="button">Pair</button>
+                    </div>
+                    <div class="form-row">
+                      <input id="connectAddr" type="text" placeholder="Connect IP:Port (192.168.1.20:5555)" />
+                      <button id="connectBtn" class="btn btn-secondary btn-sm" type="button">Connect</button>
+                    </div>
+                  </div>
+
+                  <footer class="wizard-footer">
+                    <button id="wizardBackToOemBtn" class="btn btn-secondary btn-sm" type="button">
+                      <span class="material-symbols-outlined icon-sm" aria-hidden="true">arrow_back</span>
+                      <span>Back</span>
+                    </button>
+                    <span class="mono">Step 2 of 4</span>
+                  </footer>
+                </div>
+
+                <!-- STEP 3: CONNECTING -->
+                <div id="wizardStep3" class="wizard-step">
+                  <div class="center-emblem">
+                    <div id="connectingEmblem" class="emblem-circle emblem-primary">
+                      <span id="connectingEmblemIcon" class="material-symbols-outlined icon-xl icon-spin" aria-hidden="true">sync</span>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;">
+                      <h3 id="connectingHeading" style="font-size:24px;">Wireless Pairing</h3>
+                      <p id="connectingSubtitle" class="muted">Waiting for handshake...</p>
+                    </div>
+                  </div>
+
+                  <div class="progress-block">
+                    <div class="progress-meta">
+                      <span class="muted" style="font-weight:600;">Progress</span>
+                      <span id="connectingProgressPct" class="mono" style="color:var(--primary-text);font-size:14px;">35%</span>
+                    </div>
+                    <div class="progress-track" role="progressbar" aria-valuenow="35" aria-valuemin="0" aria-valuemax="100">
+                      <div id="connectingProgressBar" class="progress-fill" style="width:35%;"></div>
+                    </div>
+                  </div>
+
+                  <ul class="task-list">
+                    <li id="connectTask1" class="task-item active">
+                      <div class="task-item-left">
+                        <span class="material-symbols-outlined icon-spin" aria-hidden="true">progress_activity</span>
+                        <span>Discover device</span>
+                      </div>
+                      <span class="task-state-label">In progress</span>
+                    </li>
+                    <li id="connectTask2" class="task-item">
+                      <div class="task-item-left">
+                        <span class="material-symbols-outlined" aria-hidden="true">radio_button_unchecked</span>
+                        <span>Exchange keys</span>
+                      </div>
+                      <span class="task-state-label">Waiting</span>
+                    </li>
+                    <li id="connectTask3" class="task-item">
+                      <div class="task-item-left">
+                        <span class="material-symbols-outlined" aria-hidden="true">radio_button_unchecked</span>
+                        <span>Open ADB tunnel</span>
+                      </div>
+                      <span class="task-state-label">Waiting</span>
+                    </li>
+                    <li id="connectTask4" class="task-item">
+                      <div class="task-item-left">
+                        <span class="material-symbols-outlined" aria-hidden="true">radio_button_unchecked</span>
+                        <span>Device ready</span>
+                      </div>
+                      <span class="task-state-label">Waiting</span>
+                    </li>
+                  </ul>
+
+                  <footer class="wizard-footer">
+                    <button id="wizardBackToQrBtn" class="btn btn-secondary btn-sm" type="button">
+                      <span class="material-symbols-outlined icon-sm" aria-hidden="true">arrow_back</span>
+                      <span>Back</span>
+                    </button>
+                    <span class="mono">Step 3 of 4</span>
+                  </footer>
+                </div>
+
+                <!-- STEP 4: SUCCESS -->
+                <div id="wizardStep4" class="wizard-step">
+                  <div class="center-emblem">
+                    <div class="emblem-circle emblem-success">
+                      <span class="material-symbols-outlined icon-xl icon-filled" aria-hidden="true">check_circle</span>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:4px;max-width:420px;">
+                      <h3 style="font-size:24px;">Phone connected</h3>
+                      <p id="successDeviceText" class="muted">Paired securely over local Wi-Fi.</p>
+                    </div>
+                  </div>
+
+                  <ul class="success-bullets">
+                    <li>
+                      <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                      <span>Wireless ADB active</span>
+                    </li>
+                    <li>
+                      <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                      <span>Screen mirroring ready</span>
+                    </li>
+                    <li>
+                      <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+                      <span>APK control enabled</span>
+                    </li>
+                  </ul>
+
+                  <footer class="wizard-footer">
+                    <span id="successDeviceCountPill" class="pill-tag pill-tag-success">1 Linked</span>
+                    <div class="btn-row">
+                      <button id="wizardPairAnotherBtn" class="btn btn-secondary btn-sm" type="button">Pair Another</button>
+                      <button id="wizardOpenDashboardBtn" class="btn btn-primary btn-sm" type="button">Open Dashboard</button>
+                    </div>
+                  </footer>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- DEVICES PANEL -->
+        <section id="tab-devices" class="panel" aria-label="Connected Devices">
+          <div class="panel-header">
+            <p id="devicesSubtitle" class="muted">Live USB &amp; wireless devices synced over WebSocket.</p>
+            <button id="refreshDevicesBtn" class="btn btn-secondary btn-sm" type="button">
+              <span class="material-symbols-outlined icon-sm" aria-hidden="true">refresh</span>
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          <div id="devicesGrid" class="cards-grid"></div>
+
+          <!-- PER-DEVICE CHILD: APK MANAGER -->
+          <section id="deviceApkPanel" class="device-child-panel hidden" aria-label="Device APK Manager">
+            <div class="hierarchy-bar">
+              <div class="hierarchy-crumb">
+                <span class="material-symbols-outlined icon-sm" style="color:var(--primary-text);" aria-hidden="true">subdirectory_arrow_right</span>
+                <span class="muted">Devices</span>
+                <span class="muted">/</span>
+                <strong id="apkTargetDeviceName">No device</strong>
+                <span class="muted">/</span>
+                <span>APK Manager</span>
+                <span id="apkTargetDeviceSerial" class="pill-tag pill-tag-neutral"></span>
+              </div>
+              <button id="closeDeviceApkBtn" class="icon-btn" type="button" aria-label="Close device APK Manager">
+                <span class="material-symbols-outlined" aria-hidden="true">close</span>
+              </button>
+            </div>
+
+            <div id="apkWebUsbNote" class="mode-banner hidden">
+              <div>
+                <strong>WebUSB Mode</strong>
+                <p class="muted">Install and Pull require Local Bridge mode.</p>
+              </div>
+              <button class="btn btn-secondary btn-sm switch-to-bridge-btn" type="button">Use Bridge</button>
+            </div>
+
+            <div id="dropZone" class="drop-zone-compact">
+              <input id="apkFileInput" type="file" accept=".apk" hidden />
+              <span class="material-symbols-outlined icon-sm" style="color:var(--primary-text);" aria-hidden="true">upload_file</span>
+              <span>Drop <strong>.apk</strong> here or <button id="pickApkBtn" class="link-btn" type="button">browse file</button> to install</span>
+            </div>
+
+            <div class="apk-toolbar">
+              <input id="apkSearch" type="text" placeholder="Filter packages..." />
+              <div class="btn-row">
+                <span id="apkCount" class="pill-tag pill-tag-neutral">0</span>
+                <label class="checkbox-label" style="font-size:13px;">
+                  <input id="showSystemToggle" type="checkbox" /> System
+                </label>
+                <button id="loadApksBtn" class="btn btn-secondary btn-sm" type="button">
+                  <span class="material-symbols-outlined icon-sm" aria-hidden="true">refresh</span>
+                  <span>Reload</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="apkList" class="apk-list"></div>
+          </section>
+        </section>
+
+        <!-- SCRCPY MIRROR PANEL -->
+        <section id="tab-scrcpy" class="panel" aria-label="Mirror">
+          <div id="scrcpyBridgeBanner" class="mode-banner hidden">
+            <div>
+              <strong>Local Bridge Required</strong>
+              <p class="muted">Screen mirroring runs <code>scrcpy</code> via Local Bridge mode.</p>
+            </div>
+            <button class="btn btn-primary btn-sm switch-to-bridge-btn" type="button">Switch to Local Bridge</button>
+          </div>
+
+          <div id="scrcpyContent" class="card">
+            <div class="scrcpy-grid" style="margin-top:0;">
+              <label>
+                Resolution
+                <select id="scrcpyMaxSize">
+                  <option value="0">Native</option>
+                  <option value="1440" selected>1440p</option>
+                  <option value="1080">1080p</option>
+                  <option value="720">720p</option>
+                </select>
+              </label>
+              <label>
+                Bitrate
+                <select id="scrcpyBitRate">
+                  <option value="8M">8 Mbps</option>
+                  <option value="16M" selected>16 Mbps</option>
+                  <option value="24M">24 Mbps</option>
+                </select>
+              </label>
+            </div>
+
+            <details class="disclosure" style="margin-bottom:18px;">
+              <summary>
+                <span>Advanced options</span>
+                <span class="material-symbols-outlined disclosure-chevron" aria-hidden="true">expand_more</span>
+              </summary>
+              <div class="disclosure-body">
+                <div class="toggles-row" style="margin:0;">
+                  <label class="checkbox-label"><input id="scrcpyStayAwake" type="checkbox" checked /> Stay Awake</label>
+                  <label class="checkbox-label"><input id="scrcpyScreenOff" type="checkbox" /> Screen Off</label>
+                  <label class="checkbox-label"><input id="scrcpyAlwaysOnTop" type="checkbox" /> Always on Top</label>
+                  <label class="checkbox-label"><input id="scrcpyNoAudio" type="checkbox" /> Mute Audio</label>
+                </div>
+              </div>
+            </details>
+
+            <div class="btn-row">
+              <button id="startScrcpyBtn" class="btn btn-primary" type="button">
+                <span class="material-symbols-outlined icon-sm" aria-hidden="true">cast</span>
+                <span>Start Mirror</span>
+              </button>
+              <button id="stopScrcpyBtn" class="btn btn-danger" type="button">
+                <span class="material-symbols-outlined icon-sm" aria-hidden="true">stop_circle</span>
+                <span>Stop Mirror</span>
+              </button>
+              <span id="scrcpySessions" class="pill-tag pill-tag-neutral">Idle</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- SETTINGS MODAL -->
+    <div id="bridgeModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="bridgeModalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <h3 id="bridgeModalTitle">Settings</h3>
+            <p class="muted" style="margin-top:2px;">Connection mode and local bridge credentials.</p>
+          </div>
+          <button id="closeBridgeModalBtn" class="icon-btn" type="button" aria-label="Close">
+            <span class="material-symbols-outlined" aria-hidden="true">close</span>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="field-label">
+            <span>Connection Mode</span>
+            <div class="mode-switch" role="group" aria-label="Connection Mode">
+              <button id="modeBridgeBtn" class="mode-btn active" data-mode="bridge" type="button">Local Bridge</button>
+              <button id="modeWebUsbBtn" class="mode-btn" data-mode="webusb" type="button">WebUSB (Zero-Install)</button>
+            </div>
+          </div>
+
+          <button id="connectUsbBtn" class="btn btn-cyan btn-sm btn-block" type="button">
+            <span class="material-symbols-outlined icon-sm" aria-hidden="true">usb</span>
+            <span id="connectUsbLabel">Connect USB (WebUSB)</span>
+          </button>
+
+          <label class="field-label">
+            Bridge URL
+            <input id="bridgeUrlInput" type="text" placeholder="http://127.0.0.1:8787" />
+          </label>
+
+          <label class="field-label">
+            Bridge Token
+            <div class="input-with-btn">
+              <input id="bridgeTokenInput" type="password" placeholder="Paste bearer token" autocomplete="off" />
+              <button id="toggleTokenVisBtn" class="btn btn-secondary btn-sm" type="button">Show</button>
+            </div>
+          </label>
+        </div>
+
+        <div class="modal-footer">
+          <button id="clearBridgeTokenBtn" class="btn btn-danger btn-sm" type="button">Clear Token</button>
+          <div class="btn-row">
+            <button id="cancelBridgeModalBtn" class="btn btn-secondary btn-sm" type="button">Cancel</button>
+            <button id="saveBridgeSettingsBtn" class="btn btn-primary btn-sm" type="button">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="webusb.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

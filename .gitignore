@@ -1,0 +1,17 @@
+# Compiled Go binaries
+adb-deck
+adb-deck.exe
+*.exe
+*.out
+*.test
+
+# Logs & OS artifacts
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local environment & IDE files
+.env
+.env.*
+*.local
