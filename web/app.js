@@ -1700,6 +1700,44 @@ document.getElementById("stopScrcpyBtn").addEventListener("click", async () => {
   }
 });
 
+function isLocalHostOrigin() {
+  const h = location.hostname;
+  return h === "127.0.0.1" || h === "localhost" || h === "::1" || h === "";
+}
+
+/**
+ * Selects Local Bridge or zero-install WebUSB on startup.
+ * On external HTTPS origins (e.g. GitHub Pages) without an explicit bridge token,
+ * probes `/api/ping` briefly and falls back cleanly to WebUSB if no helper runs locally.
+ */
+async function initConnectionMode() {
+  if (isLocalHostOrigin() || Boolean(state.token)) {
+    connectWS();
+    return;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1800);
+  try {
+    const res = await fetch(`${getBridgeBaseUrl()}/api/ping`, {
+      signal: controller.signal,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.ok) {
+        connectWS();
+        return;
+      }
+    }
+  } catch (_) {
+    // No local bridge detected from external origin; fall back to WebUSB.
+  } finally {
+    clearTimeout(timer);
+  }
+
+  setMode("webusb");
+}
+
 // Initialize
 initTheme();
 initAuthAndBridgeConfig();
@@ -1710,4 +1748,4 @@ syncSelectedDevice();
 renderDevices();
 renderScrcpySessions();
 renderDashboard();
-connectWS();
+initConnectionMode();

@@ -49,16 +49,16 @@ ADB Deck is structured as a single repository with two complementary connection 
 
 ## 5. Single-Repo Hosted Frontend Roadmap
 
-No repository decoupling is required. `web/` remains in this single Git repository as the shared source of truth for both `go:embed` binaries and static HTTPS hosting:
+No repository decoupling is required. `web/` remains in this single Git repository as the shared source of truth for both `go:embed` binaries and static HTTPS hosting via **GitHub Pages** (`https://samhebert1.github.io/adb-deck/`):
 
 | Host | Free Tier Highlights | Trade-off |
 | :--- | :--- | :--- |
-| **GitHub Pages** (`*.github.io`) | Zero extra accounts; native GitHub Actions deploy from `main` | No custom HTTP response headers |
+| **GitHub Pages** (`*.github.io`) *(Active)* | Zero extra accounts; native GitHub Actions deploy from `main` | No custom HTTP response headers |
 | **Firebase Hosting** (`*.web.app`) | Free SSL, preview channels, `firebase.json` headers | 360 MB/day transfer limit on free Spark tier |
 | **Cloudflare Pages** (`*.pages.dev`) | Unlimited free bandwidth, `_headers`, instant Git deploys | Separate Cloudflare account setup |
 | **Vercel** (`*.vercel.app`) | Fast Git preview deployments | Hobby plan limited to non-commercial use |
 
-**Pre-Hosting Checklist**:
-1. Probe `GET /api/ping` on non-localhost HTTPS origins in `web/app.js` and auto-switch to **WebUSB mode** when no local bridge is running.
-2. Echo `Access-Control-Allow-Private-Network: true` in `bridge/server.go` `OPTIONS` preflights when requested (`Access-Control-Request-Private-Network: true`) for Chrome Private/Local Network Access from `https://` origins.
-3. Choose final hosted domain (candidates: `adb-deck.web.app`, `adbdeck.web.app`, `usbdeck.web.app`, `pairdeck.web.app`, `droiddeck.web.app`).
+**Completed Hosted-Frontend Prep**:
+1. `web/app.js` probes `GET /api/ping` on non-localhost HTTPS origins and auto-switches to **WebUSB mode** when no local bridge is running.
+2. `bridge/server.go` returns `Access-Control-Allow-Private-Network: true` on `OPTIONS` preflights when requested (`Access-Control-Request-Private-Network: true`) for Chrome Private/Local Network Access from `https://` origins.
+3. `.github/workflows/pages.yml` publishes `web/` directly to `https://samhebert1.github.io/adb-deck/` on push to `main`.

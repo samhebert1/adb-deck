@@ -180,3 +180,49 @@ func TestAllowedCustomOrigin(t *testing.T) {
 		t.Fatalf("expected Access-Control-Allow-Headers to include Authorization, got %q", got)
 	}
 }
+
+func TestPrivateNetworkAccessPreflight(t *testing.T) {
+	const allowedOrigin = "https://samhebert1.github.io"
+	srv := newTestServer("valid-secret-token-abcdef", []string{allowedOrigin})
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	// Allowed origin PNA preflight -> 204 with Access-Control-Allow-Private-Network: true
+	req, _ := http.NewRequest(http.MethodOptions, ts.URL+"/api/ping", nil)
+	req.Header.Set("Origin", allowedOrigin)
+	req.Header.Set("Access-Control-Request-Method", http.MethodGet)
+	req.Header.Set("Access-Control-Request-Private-Network", "true")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("OPTIONS /api/ping for allowed origin failed: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204 for allowed PNA preflight, got %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != allowedOrigin {
+		t.Fatalf("expected Access-Control-Allow-Origin=%q, got %q", allowedOrigin, got)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Private-Network"); got != "true" {
+		t.Fatalf("expected Access-Control-Allow-Private-Network=true, got %q", got)
+	}
+
+	// Disallowed origin PNA preflight -> 403 without private network allow header
+	badReq, _ := http.NewRequest(http.MethodOptions, ts.URL+"/api/ping", nil)
+	badReq.Header.Set("Origin", "https://evil.example")
+	badReq.Header.Set("Access-Control-Request-Method", http.MethodGet)
+	badReq.Header.Set("Access-Control-Request-Private-Network", "true")
+	badResp, err := http.DefaultClient.Do(badReq)
+	if err != nil {
+		t.Fatalf("OPTIONS /api/ping for disallowed origin failed: %v", err)
+	}
+	badResp.Body.Close()
+
+	if badResp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 for disallowed PNA preflight, got %d", badResp.StatusCode)
+	}
+	if got := badResp.Header.Get("Access-Control-Allow-Private-Network"); got != "" {
+		t.Fatalf("expected empty Access-Control-Allow-Private-Network on 403, got %q", got)
+	}
+}

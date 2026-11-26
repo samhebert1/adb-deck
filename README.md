@@ -33,7 +33,19 @@ adb-deck/
 - **Go 1.26+** (to build or run from source)
 - **Android Platform Tools (`adb`)** and **`scrcpy`** on your `PATH` for Local Bridge / TUI mode *(not required for WebUSB-only browser usage)*
 
-### Run the Web Dashboard & Bridge
+### Hosted Static UI (GitHub Pages)
+
+The static dashboard is published from [web/](web/) via [pages.yml](.github/workflows/pages.yml) at:
+
+- **Hosted Dashboard**: `https://samhebert1.github.io/adb-deck/`
+
+When opened remotely with no local helper running, ADB Deck probes `/api/ping` and automatically switches to **WebUSB (Zero-Install)** mode in Chrome or Edge. To also enable Local Bridge (`scrcpy`, mDNS QR pairing, `.apk` install/pull) from the hosted UI, start your local bridge with:
+
+```powershell
+.\adb-deck.exe --allowed-origins https://samhebert1.github.io
+```
+
+### Run the Web Dashboard & Bridge (Local)
 
 ```powershell
 go run .

@@ -33,9 +33,9 @@ Central tracking record for completed deliverables and upcoming milestones acros
 - [ ] Add unit tests for `core/` command parsers (`ListDevices`, `ListPackages`, `DiscoverMDNS`) using mocked command runners.
 
 ### Phase 2 — Seamless Hosted Frontend (`web/` on HTTPS Domain)
-- [ ] Pick final public domain name (candidates: `adb-deck.web.app`, `adbdeck.web.app`, `usbdeck.web.app`, `pairdeck.web.app`) or deploy from `main` via GitHub Actions to **GitHub Pages** / **Firebase Hosting** / **Cloudflare Pages** without splitting the repo.
-- [ ] Add external-origin startup detection in `web/app.js`: probe `GET /api/ping` when loaded from a non-localhost `https://` origin and auto-switch to **WebUSB mode** if no local bridge is running.
-- [ ] Support Chrome Private/Local Network Access (`Access-Control-Allow-Private-Network: true`) on `OPTIONS` preflights in `bridge/server.go` for hosted `https://` -> `http://127.0.0.1:8787` bridge calls.
+- [x] Select GitHub Pages (`https://samhebert1.github.io/adb-deck/`) and add [pages.yml](../.github/workflows/pages.yml) to deploy `web/` from `main` without splitting the repo.
+- [x] Add external-origin startup detection in `web/app.js`: probe `GET /api/ping` when loaded from a non-localhost `https://` origin and auto-switch to **WebUSB mode** if no local bridge is running.
+- [x] Support Chrome Private/Local Network Access (`Access-Control-Allow-Private-Network: true`) on `OPTIONS` preflights in `bridge/server.go` for hosted `https://` -> `http://127.0.0.1:8787` bridge calls.
 - [ ] Implement WebUSB `sync:` protocol in `web/webusb.js` so binary `.apk` install and pull also work in zero-install mode.
 
 ### Phase 3 — Helper Packaging & Companion Experience

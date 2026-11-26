@@ -263,6 +263,10 @@ func (s *Server) withOriginCheck(next http.HandlerFunc) http.HandlerFunc {
 			w.Header().Add("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			if strings.EqualFold(r.Header.Get("Access-Control-Request-Private-Network"), "true") {
+				w.Header().Set("Access-Control-Allow-Private-Network", "true")
+				w.Header().Add("Vary", "Access-Control-Request-Private-Network")
+			}
 		}
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
